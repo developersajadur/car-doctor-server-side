@@ -32,6 +32,7 @@ async function run() {
 // ------------------ database collections ----------------
 
 const carServices = client.db("Car-Doctor").collection("CarServices");
+const bookings = client.db("Car-Doctor").collection("Bookings");
 
 // ------------------all services get --------------------------------
 app.get("/services" , async (req, res) => {
@@ -47,8 +48,24 @@ app.get("/services/:id", async (req, res) => {
     const service = await carServices.findOne(query);
     res.send(service);
   });
-  
 
+//   ------------------------- check out service-------------------------
+app.get("/service/check-out/:id", async (req, res) => {
+    const id = req.params.id;
+    const query = {_id: new ObjectId(id)}
+    const options = {
+        projection: { title: 1, price: 1 , img: 1},
+      };
+    const CheckOutService = await carServices.findOne(query,options);
+    res.send(CheckOutService);
+  });
+  
+// ------------------------ add bookings ------------------------
+app.post("/bookings" , async (req, res) => {
+    const newBooking = req.body;
+    const result = await bookings.insertOne(newBooking);
+    res.send(result);
+})
 
 
     // Send a ping to confirm a successful connection
