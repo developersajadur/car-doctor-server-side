@@ -31,12 +31,12 @@ async function run() {
 
 // ------------------ database collections ----------------
 
-const carServices = client.db("Car-Doctor").collection("CarServices");
-const bookings = client.db("Car-Doctor").collection("Bookings");
+const carServiceCollection = client.db("Car-Doctor").collection("CarServices");
+const bookingCollections = client.db("Car-Doctor").collection("Bookings");
 
 // ------------------all services get --------------------------------
 app.get("/services" , async (req, res) => {
-    const services = await carServices.find({}).toArray();
+    const services = await carServiceCollection.find({}).toArray();
     res.send(services);
   });
 
@@ -45,7 +45,7 @@ app.get("/services" , async (req, res) => {
 app.get("/services/:id", async (req, res) => {
     const id = req.params.id;
     const query = {_id: new ObjectId(id)}
-    const service = await carServices.findOne(query);
+    const service = await carServiceCollection.findOne(query);
     res.send(service);
   });
 
@@ -56,17 +56,28 @@ app.get("/service/check-out/:id", async (req, res) => {
     const options = {
         projection: { title: 1, price: 1 , img: 1},
       };
-    const CheckOutService = await carServices.findOne(query,options);
+    const CheckOutService = await carServiceCollection.findOne(query,options);
     res.send(CheckOutService);
   });
   
+
+
 // ------------------------ add bookings ------------------------
 app.post("/bookings" , async (req, res) => {
     const newBooking = req.body;
-    const result = await bookings.insertOne(newBooking);
+    const result = await bookingCollections.insertOne(newBooking);
     res.send(result);
 })
 
+  // ----------------------------- get bookings ------------------------
+  app.get("/bookings" , async (req, res) => {
+    let query = {};
+    if (req.query?.email) {
+      query = { email: req.query?.email};
+    }
+    const bookings = await bookingCollections.find(query).toArray();
+    res.send(bookings);
+})
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
