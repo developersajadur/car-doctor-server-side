@@ -1,13 +1,46 @@
 const express = require('express');
 const cors = require('cors');
+const jwt = require("jsonwebtoken")
+const cookieParser = require("cookie-parser")
 const app = express();
 const port = process.env.PORT || 5000 ;
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 
 // -------------------------middleware---------------------------------
 
-app.use(cors());
+app.use(cors(
+    {
+        origin: ["http://localhost:5173"],
+        credentials: true,
+    }
+));
 app.use(express.json());
+app.use(cookieParser())
+
+
+// ---------------- create won middleware ---------------
+const logger = async (req, res, next) => {
+    console.log("called", req.host , req.originalUrl);
+    next();
+}
+const verifyToken =async (req, res, next) => {
+    const token = req.cookies?.token;
+    console.log("middleware token", token);
+    if(!token){
+        return res.status(401).send("Access Denied");
+    }
+    jwt.verify(token, "Sojib@123" , (err, decoded) => {
+        console.log(err);
+        if(err){
+            return res.status(401).send({message : "Access Denied"});
+        }
+        console.log("middleware token" , decoded);
+        req.user = decoded;
+        next();
+    })
+
+}
+
 
 // ----------------------------------------------------------------
 
@@ -34,15 +67,29 @@ async function run() {
 const carServiceCollection = client.db("Car-Doctor").collection("CarServices");
 const bookingCollections = client.db("Car-Doctor").collection("Bookings");
 
+// ------------auth related methods ----------------
+app.post("/jwt", logger, async (req, res) => {
+    const user = req.body;
+    console.log(user);
+    const token = jwt.sign(user , "Sojib@123" , {expiresIn: "1h"})
+    res
+    .cookie("token", token , {
+        httpOnly: true,
+        secure: false,
+        sameSite:"strict"
+    })
+    .send({success: true});
+})
+
 // ------------------all services get --------------------------------
-app.get("/services" , async (req, res) => {
+app.get("/services", logger, async (req, res) => {
     const services = await carServiceCollection.find({}).toArray();
     res.send(services);
   });
 
 //   -------------------------- single service get --------------------------------
 
-app.get("/services/:id", async (req, res) => {
+app.get("/services/:id", logger, async (req, res) => {
     const id = req.params.id;
     const query = {_id: new ObjectId(id)}
     const service = await carServiceCollection.findOne(query);
@@ -50,7 +97,7 @@ app.get("/services/:id", async (req, res) => {
   });
 
 //   ------------------------- check out service-------------------------
-app.get("/service/check-out/:id", async (req, res) => {
+app.get("/service/check-out/:id", logger, async (req, res) => {
     const id = req.params.id;
     const query = {_id: new ObjectId(id)}
     const options = {
@@ -63,21 +110,26 @@ app.get("/service/check-out/:id", async (req, res) => {
 
 
 // ------------------------ add bookings ------------------------
-app.post("/bookings" , async (req, res) => {
+app.post("/bookings", logger, async (req, res) => {
     const newBooking = req.body;
     const result = await bookingCollections.insertOne(newBooking);
     res.send(result);
 })
 
   // ----------------------------- get bookings ------------------------
-  app.get("/bookings" , async (req, res) => {
+  app.get("/bookings",verifyToken, logger, async (req, res) => {
+    // console.log("Token" , req?.cookies?.token);
+    if(req.query.email !== req.user.email){
+        return res.status(401).send({message : "Access Denied"});
+    }
     let query = {};
-    if (req.query?.email) {
-      query = { email: req.query?.email};
+    if (req?.query?.email) {
+      query = { email: req?.query?.email};
     }
     const bookings = await bookingCollections.find(query).toArray();
     res.send(bookings);
 })
+
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
